@@ -95,7 +95,8 @@ class TestTechnicalFactors:
         factors = tf.all_factors()
         expected = {"mom_12_1", "mom_6_1", "mom_1m_rev", "rsi_14",
                     "vol_21", "vol_63", "idio_vol", "skew_60",
-                    "z_score_52w", "corr_mkt_60"}
+                    "z_score_52w", "corr_mkt_60",
+                    "price_acceleration", "volume_trend"}
         assert set(factors.keys()) == expected
 
 
