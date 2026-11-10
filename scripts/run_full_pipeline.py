@@ -12,10 +12,15 @@ End-to-end walk-forward backtest combining:
 
 import sys
 import os
+import argparse
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import numpy as np
 import pandas as pd
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
 
 from sae.data.generator import MarketDataGenerator
 from sae.factors.technical import TechnicalFactors
@@ -78,14 +83,65 @@ def make_portfolio_fn(method="risk_parity"):
     return portfolio_fn
 
 
+def save_equity_curve(strategies: dict, out_path: str) -> None:
+    """Save a 2-panel equity curve + drawdown chart to out_path."""
+    fig = plt.figure(figsize=(12, 7))
+    gs = gridspec.GridSpec(2, 1, height_ratios=[3, 1], hspace=0.08)
+    ax_eq = fig.add_subplot(gs[0])
+    ax_dd = fig.add_subplot(gs[1], sharex=ax_eq)
+
+    colors = {"Risk Parity": "#2196F3", "Mean-Variance": "#FF9800", "Benchmark": "#9E9E9E"}
+
+    for name, rets in strategies.items():
+        cum = (1 + rets).cumprod()
+        color = colors.get(name, None)
+        lw = 1.5 if "Benchmark" in name else 2.0
+        ls = "--" if "Benchmark" in name else "-"
+        ax_eq.plot(cum.index, cum.values, label=name, color=color, lw=lw, ls=ls)
+
+        roll_max = cum.cummax()
+        dd = (cum - roll_max) / (roll_max + 1e-10)
+        ax_dd.plot(dd.index, dd.values * 100, color=color, lw=lw, ls=ls, alpha=0.8)
+
+    ax_eq.set_ylabel("Cumulative Return", fontsize=11)
+    ax_eq.set_title("Systematic Alpha Engine — Walk-Forward Backtest", fontsize=13, fontweight="bold")
+    ax_eq.legend(fontsize=9, loc="upper left")
+    ax_eq.grid(True, alpha=0.3)
+    ax_eq.axhline(1.0, color="black", lw=0.8, alpha=0.4)
+    plt.setp(ax_eq.get_xticklabels(), visible=False)
+
+    ax_dd.set_ylabel("Drawdown (%)", fontsize=11)
+    ax_dd.set_xlabel("Date", fontsize=11)
+    ax_dd.fill_between(dd.index, dd.values * 100, 0, alpha=0.15, color="#2196F3")
+    ax_dd.grid(True, alpha=0.3)
+
+    fig.savefig(out_path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    print(f"  Equity curve saved → {out_path}")
+
+
+def parse_args():
+    p = argparse.ArgumentParser(description="Systematic Alpha Engine — full pipeline backtest")
+    p.add_argument("--seed",     type=int, default=42,   help="Random seed for data generation")
+    p.add_argument("--n-stocks", type=int, default=100,  help="Number of synthetic stocks")
+    p.add_argument("--n-days",   type=int, default=1260, help="Number of trading days (~5 years)")
+    p.add_argument("--out-dir",  type=str, default="results", help="Output directory for plots")
+    return p.parse_args()
+
+
 def main():
+    args = parse_args()
+    os.makedirs(args.out_dir, exist_ok=True)
+
     print("=" * 60)
     print("  Systematic Alpha Engine — Full Pipeline Backtest")
     print("=" * 60)
+    print(f"  seed={args.seed}  n_stocks={args.n_stocks}  n_days={args.n_days}")
 
     # ── 1. Generate data ──────────────────────────────────────────────
     print("\n[1/6] Generating synthetic market data…")
-    gen = MarketDataGenerator(n_stocks=100, n_days=1260, n_sectors=5, seed=42)
+    gen = MarketDataGenerator(n_stocks=args.n_stocks, n_days=args.n_days,
+                              n_sectors=5, seed=args.seed)
     data = gen.generate()
     prices   = data["prices"]
     returns  = data["returns"]
@@ -191,6 +247,10 @@ def main():
                     f"  {name:<30} {ar * 100:>7.2f}% {av * 100:>7.2f}% "
                     f"{sh:>7.3f} {md * 100:>7.2f}%"
                 )
+
+        # ── Save equity curve plot ────────────────────────────────────
+        plot_path = os.path.join(args.out_dir, "equity_curve.png")
+        save_equity_curve(strategies, plot_path)
 
     print("\n✓  Full pipeline backtest complete.")
 

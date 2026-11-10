@@ -7,6 +7,7 @@ them using IC, ICIR, Newey-West t-statistics, factor decay, and BH FDR correctio
 
 import sys
 import os
+import argparse
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import numpy as np
@@ -21,14 +22,25 @@ from sae.evaluation.statistics import benjamini_hochberg
 from scipy import stats
 
 
+def parse_args():
+    p = argparse.ArgumentParser(description="Systematic Alpha Engine — factor research")
+    p.add_argument("--seed",     type=int, default=42,   help="Random seed")
+    p.add_argument("--n-stocks", type=int, default=100,  help="Number of synthetic stocks")
+    p.add_argument("--n-days",   type=int, default=1260, help="Number of trading days")
+    p.add_argument("--fdr-alpha",type=float, default=0.05, help="BH FDR significance level")
+    return p.parse_args()
+
+
 def main():
+    args = parse_args()
     print("=" * 60)
     print("  Systematic Alpha Engine — Factor Research")
     print("=" * 60)
+    print(f"  seed={args.seed}  n_stocks={args.n_stocks}  fdr_alpha={args.fdr_alpha}")
 
     # ── 1. Generate synthetic data ────────────────────────────────────
-    print("\n[1/4] Generating synthetic market data (100 stocks × 5 years)…")
-    gen = MarketDataGenerator(n_stocks=100, n_days=1260, n_sectors=5, seed=42)
+    print(f"\n[1/4] Generating synthetic market data ({args.n_stocks} stocks × {args.n_days} days)…")
+    gen = MarketDataGenerator(n_stocks=args.n_stocks, n_days=args.n_days, n_sectors=5, seed=args.seed)
     data = gen.generate()
 
     prices  = data["prices"]
