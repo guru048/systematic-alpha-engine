@@ -117,6 +117,25 @@ class TechnicalFactors:
 
         return self.returns.apply(_corr)
 
+    def price_acceleration(self) -> pd.DataFrame:
+        """
+        Price acceleration: difference between short-term and medium-term momentum.
+        Captures stocks that are accelerating (recent momentum > lagged momentum).
+        mom_3_1 - mom_6_3: positive = recent outperformance accelerating.
+        """
+        mom_3_1 = self.prices.shift(21) / self.prices.shift(63) - 1.0
+        mom_6_3 = self.prices.shift(63) / self.prices.shift(126) - 1.0
+        return mom_3_1 - mom_6_3
+
+    def volume_trend(self) -> pd.DataFrame:
+        """
+        Volume trend: ratio of recent to historical average daily volume.
+        Rising volume confirms momentum; falling volume warns of reversal.
+        """
+        vol_fast = self.volume.rolling(21, min_periods=15).mean()
+        vol_slow = self.volume.rolling(63, min_periods=40).mean()
+        return vol_fast / (vol_slow + 1e-8) - 1.0
+
     # ── Convenience ─────────────────────────────────────────────────────
 
     def all_factors(self) -> dict:
@@ -132,4 +151,6 @@ class TechnicalFactors:
             "skew_60": self.skew_60(),
             "z_score_52w": self.z_score_52(),
             "corr_mkt_60": self.corr_mkt_60(),
+            "price_acceleration": self.price_acceleration(),
+            "volume_trend": self.volume_trend(),
         }
